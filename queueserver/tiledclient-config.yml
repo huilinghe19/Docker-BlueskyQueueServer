@@ -1,0 +1,2 @@
+test:
+  uri: http://localhost:8000/api
