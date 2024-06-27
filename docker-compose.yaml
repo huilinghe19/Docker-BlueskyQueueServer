@@ -8,7 +8,7 @@ services:
     volumes:
       - /tmp/mongo-data:/data/db
 
-  bluesky-tiled:
+  tiled:
     env_file: .env
     image: registry.hzdr.de/hzb/bluesky/containers/tiled:1.0
     ports:
@@ -41,6 +41,7 @@ services:
 
     depends_on:
       - "redis"
+      - "tiled"
       - "zmq-proxy"
 
   bluesky-httpserver:
@@ -64,7 +65,6 @@ services:
   mariadb:
     #image: esrfbcu/daiquiri-testdb:master
     image: esrfbcu/mimosa-database:main
-   
 
   daiquiri:
     image: esrfbcu/daiquiri:main
