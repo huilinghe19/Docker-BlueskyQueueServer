@@ -1,0 +1,4 @@
+bluesky-queueserver-api
+bluesky-queueserver
+bluesky-httpserver
+httpie
