@@ -1,0 +1,121 @@
+version: "3"
+services:
+  bluesky-mongodb:
+    env_file: .env
+    image: mongo:6-jammy
+    ports:
+      - "27017:27017"
+    volumes:
+      - /tmp/mongo-data:/data/db
+
+  bluesky-tiled:
+    env_file: .env
+    image: registry.hzdr.de/hzb/bluesky/containers/tiled:1.0
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./tiled/config:/deploy/config:ro
+    command: tiled serve config /deploy/config/config.yml --host 0.0.0.0
+    depends_on:
+      - "bluesky-mongodb"
+
+  redis:
+    env_file: .env
+    image: redis:latest
+    ports:
+      - "6379:6379"
+
+  zmq-proxy:
+    env_file: .env
+    build: ./zmq-proxy
+    ports:
+      - "5567:5567"
+      - "5568:5568"
+
+  queueserver:
+    env_file: .env
+    build: ./queueserver
+    ports:
+      - "60615:60615"
+      - "60625:60625"
+
+    depends_on:
+      - "redis"
+      - "zmq-proxy"
+
+  bluesky-httpserver:
+    env_file: .env
+    build: ./httpserver
+    ports:
+      - "60610:60610"
+    depends_on:
+      - "queueserver"
+
+  ### Below is to use the previous bluesky website 2023, similar as the Qt GUI.
+  # bluesky-website:
+  #   env_file: .env
+  #   build: ./webclient/webclient-react
+  #   ports:
+  #     - 3000:3000
+  #   depends_on:
+  #     - "bluesky-httpserver"
+
+  ## Below is to use daiquiri UI from ESRF.
+  mariadb:
+    #image: esrfbcu/daiquiri-testdb:master
+    image: esrfbcu/mimosa-database:main
+   
+
+  daiquiri:
+    image: esrfbcu/daiquiri:main
+    build:
+      context: ./daiquiri-docker
+    ports:
+      - "9030:9030"
+      - "9031:9031"
+      - "9032:9032"
+      - "8080:8080"
+    depends_on:
+      - mariadb
+      #- queueserver
+    environment:
+      - DAIQUIRI_IMPLEMENTORS=daiquiri_bluesky.implementors
+      - DAIQUIRI_RESOURCE_FOLDER=/daiquiri-bluesky/daiquiri_bluesky/resources
+      #- DAIQUIRI_SAVING_FOLDER=/daiquiri-bluesky/daiquiri_bluesky/core/saving
+      #- DAIQUIRI_META_URL=mariadb:3307/test
+    volumes:
+      - ./daiquiri-bluesky:/daiquiri-bluesky
+      - ./run.sh:/run.sh
+      #- ./daiquiri-bluesky/daiquiri_bluesky/core/saving/simple.py:/daiquiri/daiquiri/core/saving/simple.py
+
+  ## Below is for the flint and bliss data.
+
+  # redis2:
+  #   image: redis/redis-stack:7.2.0-v5
+  #   ports:
+  #     - "6363:6379"
+  # bliss_data:
+  #   image: gitlab.desy.de:5555/fs-ec/bluesky_blissdata:latest
+  #   ports:
+  #     - "9034:9032"
+  #       #- "9031:9030"
+  #       #- "9013:9010"
+  #     - "5577:5577"
+  #     #- "127.0.0.1:6379:6379"
+  #   environment:
+  #     - redis_host=redis2
+  #     - redis_port=6379
+  #   depends_on:
+  #     - redis2
+  # flint:
+  #   image: gitlab.desy.de:5555/udai.singh/flint_docker:latest
+  #   ports:
+  #     - "9035:9033"
+  #   volumes:
+  #     - /tmp/.X11-unix:/tmp/.X11-unix
+  #   environment:
+  #     - REDIS_DATA_HOST=redis://redis2:6379
+  #     - DISPLAY=$DISPLAY
+  #   depends_on:
+  #     - redis2
+  #     - bliss_data
