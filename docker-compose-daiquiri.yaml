@@ -1,0 +1,116 @@
+version: "3"
+services:
+  redis:
+    image: redis/redis-stack:7.2.0-v5
+    ports:
+      - "6380:6379"
+  redis2:
+    image: redis/redis-stack:latest
+    ports:
+      - "6377:6378"
+  bliss_data:
+    image: gitlab.desy.de:5555/fs-ec/bluesky_blissdata:latest
+    ports:
+      - "9037:9032"
+      #   - "9031:9030"
+      #   - "9013:9010"
+      #- "5579:5577"
+      - "5579:5577"
+      # - "127.0.0.1:6379:6379"
+    environment:
+      - redis_host=redis
+      - redis_port=6379
+    depends_on:
+      - redis
+  flint:
+    image: gitlab.desy.de:5555/udai.singh/flint_docker:latest
+    ports:
+      - "9041:9033"
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    environment:
+      - REDIS_DATA_HOST=redis://redis:6379
+      - DISPLAY=$DISPLAY
+    depends_on:
+      - redis
+      - bliss_data
+  mariadb:
+    image: esrfbcu/mimosa-database:2.2.0
+
+  daiquiri:
+    #image: esrfbcu/daiquiri:main
+    build:
+      context: ./daiquiri-docker
+    ports:
+      - "9032:9032"
+      - "9030:9030"
+      - "8080:8080"
+      - "9010:9010"
+
+    depends_on:
+      - mariadb
+      - flint
+      - bliss_data
+      - redis
+      - bluesky-httpserver
+      #- queueserver
+
+    environment:
+      - DAIQUIRI_IMPLEMENTORS=daiquiri_bluesky.implementors
+      - DAIQUIRI_RESOURCE_FOLDER=/daiquiri-bluesky/daiquiri_bluesky/resources
+      # - DAIQUIRI_SAVING_FOLDER=/daiquiri-bluesky/daiquiri_bluesky/core/saving
+    volumes:
+      - ./daiquiri-bluesky:/daiquiri-bluesky
+      - ./run.sh:/run.sh
+      # - ./daiquiri-bluesky/daiquiri_bluesky/core/saving/simple.py:/daiquiri/daiquiri/core/saving/simple.py
+
+  bluesky-mongodb:
+    env_file: .env
+    image: mongo:6-jammy
+    ports:
+      - "27017:27017"
+    volumes:
+      - /tmp/mongo-data:/data/db
+
+  bluesky-tiled:
+    env_file: .env
+    image: registry.hzdr.de/hzb/bluesky/containers/tiled:1.0
+    ports:
+      - "8000:8000"
+    volumes:
+      - /home/oil/work/tiled/config:/deploy/config:ro
+    command: tiled serve config /deploy/config/config.yml --host 0.0.0.0
+    depends_on:
+      - "bluesky-mongodb"
+
+  # redis2:
+  #   env_file: .env
+  #   image: redis:latest
+  #   ports:
+  #     - "6379:6379"
+  zmq-proxy:
+    env_file: .env
+    build: ./Docker/zmq-proxy
+    ports:
+      - "5567:5567"
+      - "5568:5568"
+
+  queueserver:
+    env_file: .env
+    build: ./Docker/re-manager
+    ports:
+      - "60615:60615"
+      - "60625:60625"
+
+    depends_on:
+      - "redis2"
+      - "bluesky-tiled"
+      - "zmq-proxy"
+
+  bluesky-httpserver:
+    env_file: .env
+    build: ./Docker/httpserver
+    ports:
+      - "60610:60610"
+    depends_on:
+      - "queueserver"

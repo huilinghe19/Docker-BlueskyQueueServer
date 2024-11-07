@@ -1,6 +1,3 @@
 [submodule "daiquiri-docker"]
 	path = daiquiri-docker
 	url = https://gitlab.desy.de/fs-ec/daiquiri/daiquiri-docker.git
-[submodule "daiquiri-bluesky"]
-	path = daiquiri-bluesky
-	url = https://gitlab.desy.de/fs-ec/daiquiri/daiquiri-bluesky.git
